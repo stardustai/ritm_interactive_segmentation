@@ -16,6 +16,9 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from service_streamer import ThreadedStreamer, Streamer
+import urllib.request
+import ssl
+from flask_cors import CORS, cross_origin
 
 EVAL_MAX_CLICKS = 20
 MODEL_THRESH = 0.49
@@ -37,6 +40,7 @@ predictor = get_predictor(model, brs_mode, device, prob_thresh=MODEL_THRESH)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 10 # 10MB max
 app.config['UPLOAD_EXTENSIONS'] = ['.jpg', '.png', '.gif']
+cors = CORS(app)
 
 @app.route("/interactive_segmentation", methods=["POST"])
 def main():
@@ -50,7 +54,8 @@ def main():
     prev_mask = request.files.get('prev_mask', None) 
     tolerance = int(request.form.get('tolerance', 1))
     view_img = request.form.get('view_img', False)
-    view_img = True if view_img.lower() == 'true' else False
+    view_img = False
+    # view_img = True if view_img.lower() == 'true' else False
     img:Image = None
     filename:str = None
 
@@ -73,10 +78,12 @@ def main():
                 # img = ...
             img.save(file_path)
         elif file_url: #TODO
-            filename = file_url.split('/')[-1]
+            # filename = file_url.split('/')[-1]
+            ssl._create_default_https_context = ssl._create_unverified_context
+            urllib.request.urlretrieve(file_url, file_path)
             # load file from url
-            # img = ...
-            img.save(file_path)
+            img = Image.open(file_path)
+            # img.save(file_path)
     
     # processing imputs
     img_np, clicks, prev_mask = processing_inputs(img, click_history, prev_polygon)
